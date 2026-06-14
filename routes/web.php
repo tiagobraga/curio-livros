@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CatalogController;
 use App\Http\Controllers\DashboardController;
 
 // Auth Routes
@@ -14,14 +15,12 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard', [DashboardController::class, 'index']); // Fallback route
 
-    // Catalog Placeholders (Fase 3)
-    Route::get('/catalog', function () {
-        return view('catalog.index'); // We will build these views soon
-    })->name('catalog.index');
-
-    Route::get('/catalog/create', function () {
-        return view('catalog.create');
-    })->name('catalog.create');
+    // Catalog Routes (Fase 3)
+    Route::get('/catalog', [CatalogController::class, 'index'])->name('catalog.index');
+    Route::get('/catalog/create', [CatalogController::class, 'create'])->name('catalog.create');
+    Route::post('/catalog', [CatalogController::class, 'store'])->name('catalog.store');
+    Route::get('/catalog/lookup', [CatalogController::class, 'lookup'])->name('catalog.lookup');
+    Route::get('/catalog/{id}', [CatalogController::class, 'show'])->name('catalog.show');
 
     // Loans Placeholders (Fase 4)
     Route::get('/loans', function () {
