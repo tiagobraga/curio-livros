@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: curio-livros-dev
+    ports:
+      - "8088:8088"
+    volumes:
+      - .:/var/www
+      - /var/www/vendor # Evita sobrescrever vendor do host
+    networks:
+      - servidor_default
+    restart: unless-stopped
+
+networks:
+  servidor_default:
+    external: true
