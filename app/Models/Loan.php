@@ -30,7 +30,7 @@ class Loan extends Model
      */
     public function localCopy()
     {
-        return $this->belongsTo(LocalCopy::class);
+        return $this->belongsTo(LocalCopy::class)->withTrashed();
     }
 
     /**

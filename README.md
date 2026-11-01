@@ -1,6 +1,6 @@
-# Curió Livros
+# Biblió: Biblioteca Inteligente
 
-O **Curió Livros** é um sistema web de gestão de acervos bibliográficos com catálogo coletivo (multiunidades/multibibliotecas), projetado para ser moderno, leve, responsivo (Desktop & Mobile) e compatível com o padrão de metadados **BIBFRAME** (Linked Data).
+O **Biblió** (anteriormente conhecido como *Curió Livros*) é um sistema web de gestão de acervos bibliográficos com catálogo coletivo (multiunidades/multibibliotecas), projetado para ser moderno, leve, responsivo (Desktop & Mobile) e compatível com o padrão de metadados **BIBFRAME** (Linked Data).
 
 Este projeto é desenvolvido com foco em facilidade de uso em pequenas e médias bibliotecas, permitindo a catalogação rápida de livros através do escaneamento do código de barras (ISBN) diretamente pela câmera do celular e autopreenchimento de metadados via APIs externas (Google Books e Open Library).
 
@@ -17,7 +17,7 @@ Este projeto é desenvolvido com foco em facilidade de uso em pequenas e médias
 
 ## 📚 Modelo de Metadados: BIBFRAME
 
-Diferente dos sistemas tradicionais que usam o formato legado MARC21, o Curió Livros adota o padrão **BIBFRAME** (Bibliographic Framework), o sucessor moderno baseado em Linked Data (Web Semântica). 
+Diferente dos sistemas tradicionais que usam o formato legado MARC21, o Biblió adota o padrão **BIBFRAME** (Bibliographic Framework), o sucessor moderno baseado em Linked Data (Web Semântica). 
 
 A modelagem de dados separa a informação em três níveis:
 1.  **Work (Obra):** O conceito intelectual da obra (autor, título original, idioma original, assunto).

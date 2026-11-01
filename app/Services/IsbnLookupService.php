@@ -22,15 +22,96 @@ class IsbnLookupService
             return null;
         }
 
-        // Tenta buscar primeiro no Google Books
-        $data = $this->fetchFromGoogleBooks($cleanIsbn);
+        // 1. Tenta buscar no BrasilAPI (altamente recomendado para acervos brasileiros, integra a CBL)
+        $data = $this->fetchFromBrasilApi($cleanIsbn);
 
-        // Se não encontrar, tenta Open Library
+        // 2. Se não encontrar, tenta Google Books
+        if (!$data) {
+            $data = $this->fetchFromGoogleBooks($cleanIsbn);
+        }
+
+        // 3. Se não encontrar, tenta Open Library
         if (!$data) {
             $data = $this->fetchFromOpenLibrary($cleanIsbn);
         }
 
         return $data;
+    }
+
+    /**
+     * Fetch metadata from BrasilAPI.
+     */
+    private function fetchFromBrasilApi(string $isbn): ?array
+    {
+        try {
+            $response = Http::timeout(5)->get("https://brasilapi.com.br/api/isbn/v1/{$isbn}");
+
+            if ($response->successful()) {
+                $info = $response->json();
+
+                // BrasilAPI lists authors as an array of strings
+                $authors = isset($info['authors']) && is_array($info['authors'])
+                    ? implode(', ', $info['authors'])
+                    : '';
+
+                $subjects = isset($info['subjects']) && is_array($info['subjects'])
+                    ? $info['subjects']
+                    : [];
+
+                return [
+                    '@context' => [
+                        'bf' => 'http://id.loc.gov/ontologies/bibframe/',
+                        'schema' => 'http://schema.org/'
+                    ],
+                    '@type' => 'bf:Instance',
+                    'title' => $info['title'] ?? '',
+                    'subtitle' => $info['subtitle'] ?? '',
+                    'author' => $authors,
+                    'publisher' => $info['publisher'] ?? '',
+                    'publication_year' => isset($info['year']) ? (string)$info['year'] : '',
+                    'pages' => $info['page_count'] ?? null,
+                    'isbn' => $isbn,
+                    'cover_url' => $info['cover_url'] ?? null,
+                    'subjects' => $subjects,
+                    'description' => $info['synopsis'] ?? '',
+                    'bf:hasWork' => [
+                        '@type' => 'bf:Work',
+                        'bf:title' => [
+                            '@type' => 'bf:Title',
+                            'bf:mainTitle' => $info['title'] ?? ''
+                        ],
+                        'bf:contribution' => [
+                            '@type' => 'bf:Contribution',
+                            'bf:agent' => [
+                                '@type' => 'bf:Agent',
+                                'schema:name' => $authors
+                            ]
+                        ],
+                        'bf:language' => 'http://id.loc.gov/vocabulary/languages/por',
+                        'bf:subject' => array_map(function($subject) {
+                            return ['@type' => 'bf:Topic', 'schema:name' => $subject];
+                        }, $subjects)
+                    ],
+                    'bf:provisionActivity' => [
+                        '@type' => 'bf:ProvisionActivity',
+                        'bf:agent' => ['@type' => 'bf:Agent', 'schema:name' => $info['publisher'] ?? ''],
+                        'bf:date' => isset($info['year']) ? (string)$info['year'] : '',
+                        'bf:place' => $info['location'] ?? ''
+                    ],
+                    'bf:identifiedBy' => [
+                        ['@type' => 'bf:Isbn', 'rdf:value' => $isbn]
+                    ],
+                    'bf:extent' => [
+                        '@type' => 'bf:Extent',
+                        'rdf:value' => isset($info['page_count']) ? $info['page_count'] . ' p.' : ''
+                    ]
+                ];
+            }
+        } catch (\Exception $e) {
+            Log::error("Erro ao consultar BrasilAPI para ISBN {$isbn}: " . $e->getMessage());
+        }
+
+        return null;
     }
 
     /**

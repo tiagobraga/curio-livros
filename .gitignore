@@ -25,3 +25,11 @@ _ide_helper.php
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Ignorar uploads e testes avulsos
+test_smtp*.php
+public/covers
+public/logos/*
+!public/logos/.gitkeep
+storage/app/public/covers/*
+!storage/app/public/covers/.gitkeep

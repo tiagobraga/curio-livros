@@ -6,4 +6,26 @@
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+    
+    --color-primary: #1E4D2B;
+    --color-primary-hover: #2a6438;
+    --color-accent: #C0392B;
+    --color-accent-hover: #a93226;
+    --color-brand-creme: #F7F5F0;
+    --color-brand-card: #FFFFFF;
+    --color-brand-text: #2C2C2C;
+    --color-brand-border: #E0DDD8;
+
+    /* Remap Tailwind slate palette to our premium light theme colors */
+    --color-slate-950: #F7F5F0;   /* Page Background */
+    --color-slate-900: #FFFFFF;   /* Cards & Containers Background */
+    --color-slate-850: #EADFD3;   /* High-contrast Light Divider/Borders */
+    --color-slate-800: #E5DEC9;   /* Standard Light Borders */
+    --color-slate-700: #C4BDAC;   /* Focus/Selected Border */
+    --color-slate-600: #8A857A;   /* Muted Metadata / Captions */
+    --color-slate-500: #6B675E;   /* Secondary Texts / Muted Labels */
+    --color-slate-400: #3D3B37;   /* Regular Text */
+    --color-slate-300: #2C2C2C;   /* Semi-bold / Heading Text */
+    --color-slate-200: #1C1C1C;   /* Bold Accent Text */
+    --color-slate-100: #0E0E0E;   /* Deep High-Contrast Text */
 }

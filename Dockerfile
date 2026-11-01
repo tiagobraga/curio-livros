@@ -19,6 +19,9 @@ RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 # Instala extensões do PHP
 RUN docker-php-ext-install pdo pdo_pgsql pgsql mbstring exif pcntl bcmath gd zip
 
+# Hardening de segurança PHP (mitigação CVE-2026-109618, CVE-2026-109619 e CVE-2026-115560)
+RUN printf "; Hardening PHP2Shell e CVE-2026-115560\nsession.upload_progress.enabled = 0\nexpose_php = Off\n" > /usr/local/etc/php/conf.d/zz-security.ini
+
 # Copia o Composer oficial
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 

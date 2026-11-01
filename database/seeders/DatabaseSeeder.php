@@ -36,7 +36,6 @@ class DatabaseSeeder extends Seeder
             'email' => 'admin@curio.ia.br',
             'password' => Hash::make('admin123'),
             'role' => 'admin',
-            'library_id' => null,
         ]);
 
         User::create([
@@ -44,48 +43,47 @@ class DatabaseSeeder extends Seeder
             'email' => 'curador@curio.ia.br',
             'password' => Hash::make('curador123'),
             'role' => 'curator',
-            'library_id' => null,
         ]);
 
-        User::create([
+        $pedro = User::create([
             'name' => 'Pedro Gestor Central',
             'email' => 'gestor.central@curio.ia.br',
             'password' => Hash::make('gestor123'),
             'role' => 'manager',
-            'library_id' => $central->id,
         ]);
+        $pedro->libraries()->attach($central->id);
 
-        User::create([
+        $ana = User::create([
             'name' => 'Ana Atendente Central',
             'email' => 'atendente.central@curio.ia.br',
             'password' => Hash::make('atendente123'),
             'role' => 'attendant',
-            'library_id' => $central->id,
         ]);
+        $ana->libraries()->attach($central->id);
 
-        User::create([
+        $lucas = User::create([
             'name' => 'Lucas Atendente Lapa',
             'email' => 'atendente.lapa@curio.ia.br',
             'password' => Hash::make('atendente123'),
             'role' => 'attendant',
-            'library_id' => $lapa->id,
         ]);
+        $lucas->libraries()->attach($lapa->id);
 
-        User::create([
+        $joao = User::create([
             'name' => 'João Leitor Central',
             'email' => 'leitor1@curio.ia.br',
             'password' => Hash::make('leitor123'),
             'role' => 'user',
-            'library_id' => $central->id,
         ]);
+        $joao->libraries()->attach($central->id);
 
-        User::create([
+        $fernanda = User::create([
             'name' => 'Fernanda Leitora Lapa',
             'email' => 'leitor2@curio.ia.br',
             'password' => Hash::make('leitor123'),
             'role' => 'user',
-            'library_id' => $lapa->id,
         ]);
+        $fernanda->libraries()->attach($lapa->id);
 
         // 3. Criar Itens Centrais (BIBFRAME Work/Instance)
         $domCasmurro = CentralItem::create([

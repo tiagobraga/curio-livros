@@ -19,6 +19,21 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        if (config('app.url')) {
+            \Illuminate\Support\Facades\URL::forceRootUrl(config('app.url'));
+        }
+
+        if (request()->header('X-Forwarded-Proto') === 'https' || request()->server('HTTP_X_FORWARDED_PROTO') === 'https' || app()->environment('production') || str_contains(config('app.url'), 'https')) {
+            \Illuminate\Support\Facades\URL::forceScheme('https');
+        }
+
+        // Auto-executa migrações pendentes caso as novas colunas ainda não tenham sido migradas no banco
+        try {
+            if (\Illuminate\Support\Facades\Schema::hasTable('libraries') && !\Illuminate\Support\Facades\Schema::hasColumn('libraries', 'custom_fields')) {
+                \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Falha ao auto-executar migrações: ' . $e->getMessage());
+        }
     }
 }

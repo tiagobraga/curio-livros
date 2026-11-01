@@ -17,20 +17,48 @@ class LoanController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
+        if ($user->isLibraryUser()) {
+            $loans = Loan::with(['localCopy.centralItem', 'localCopy.library', 'attendant'])
+                ->where('user_id', $user->id)
+                ->orderBy('loan_date', 'desc')
+                ->paginate(15)
+                ->withQueryString();
+
+            return view('loans.my_loans', compact('loans'));
+        }
+
         if (!$user->isAttendant()) {
             abort(403, 'Acesso negado.');
         }
 
         $search = $request->input('search');
-        $statusFilter = $request->input('status'); // all, active, late, returned
+        $statusFilter = $request->input('status');
+        if (is_null($statusFilter) || $statusFilter === '') {
+            $statusFilter = 'active';
+        }
+        $libraryFilter = $request->input('library_id');
+
+        // Obter a lista de bibliotecas permitidas para o filtro (apenas onde é gestor ou atendente)
+        $libraries = $user->getStaffLibraries();
+        $allowedLibraryIds = $user->getStaffLibraryIds();
 
         $query = Loan::with(['localCopy.centralItem', 'user', 'attendant']);
 
-        // Se o atendente for associado a uma biblioteca específica, filtra os empréstimos daquela biblioteca
-        if ($user->library_id) {
-            $query->whereHas('localCopy', function($q) use ($user) {
-                $q->where('library_id', $user->library_id);
+        // Se o atendente for associado a bibliotecas específicas, filtra os empréstimos dessas bibliotecas
+        if (!$user->isCurator()) {
+            $query->whereHas('localCopy', function($q) use ($allowedLibraryIds) {
+                $q->whereIn('library_id', $allowedLibraryIds);
             });
+        }
+
+        // Aplica o filtro de biblioteca selecionada se for válida
+        if ($libraryFilter && in_array($libraryFilter, $allowedLibraryIds)) {
+            $query->whereHas('localCopy', function($q) use ($libraryFilter) {
+                $q->where('library_id', $libraryFilter);
+            });
+            $scopedLibraryIds = [$libraryFilter];
+        } else {
+            $scopedLibraryIds = $allowedLibraryIds;
         }
 
         // Filtro de Busca
@@ -57,12 +85,27 @@ class LoanController extends Controller
 
         $loans = $query->orderBy('loan_date', 'desc')->paginate(15)->withQueryString();
 
-        return view('loans.index', compact('loans', 'search', 'statusFilter'));
+        // Estatísticas de circulação sob o escopo selecionado
+        $totalBooks = LocalCopy::whereIn('library_id', $scopedLibraryIds)->sum('quantity');
+        $activeLoansCount = Loan::active()
+            ->whereHas('localCopy', function($q) use ($scopedLibraryIds) {
+                $q->whereIn('library_id', $scopedLibraryIds);
+            })->count();
+        $lateLoansCount = Loan::late()
+            ->whereHas('localCopy', function($q) use ($scopedLibraryIds) {
+                $q->whereIn('library_id', $scopedLibraryIds);
+            })->count();
+        $recentLoansCount = Loan::where('loan_date', '>=', now()->subDays(30))
+            ->whereHas('localCopy', function($q) use ($scopedLibraryIds) {
+                $q->whereIn('library_id', $scopedLibraryIds);
+            })->count();
+
+        return view('loans.index', compact(
+            'loans', 'search', 'statusFilter', 'libraries', 'libraryFilter',
+            'totalBooks', 'activeLoansCount', 'lateLoansCount', 'recentLoansCount'
+        ));
     }
 
-    /**
-     * Show the form for creating a new loan.
-     */
     public function create()
     {
         $user = Auth::user();
@@ -70,15 +113,23 @@ class LoanController extends Controller
             abort(403, 'Acesso negado.');
         }
 
-        $libraryId = $user->library_id ?: 1; // Admin sem biblioteca usa a central (ID 1)
+        $associatedLibraryIds = $user->getStaffLibraryIds();
 
-        // Lista leitores (papel 'user')
-        $readers = User::where('role', 'user')->orderBy('name', 'asc')->get();
+        // Lista leitores (papel 'user') associados a alguma das unidades do atendente/gestor
+        $readersQuery = User::where('role', 'user');
+        if (!$user->isCurator()) {
+            $readersQuery->whereHas('libraries', function($q) use ($associatedLibraryIds) {
+                $q->whereIn('libraries.id', $associatedLibraryIds);
+            });
+        }
+        $readers = $readersQuery->orderBy('name', 'asc')->get();
 
-        // Lista cópias locais desta unidade
-        $localCopies = LocalCopy::with('centralItem')
-            ->where('library_id', $libraryId)
-            ->get();
+        // Lista cópias locais dessas unidades
+        $localCopiesQuery = LocalCopy::with(['centralItem', 'library']);
+        if (!$user->isCurator()) {
+            $localCopiesQuery->whereIn('library_id', $associatedLibraryIds);
+        }
+        $localCopies = $localCopiesQuery->get();
 
         // Filtra quais cópias realmente possuem exemplares disponíveis fisicamente
         $availableCopies = $localCopies->filter(function($copy) {
@@ -115,19 +166,34 @@ class LoanController extends Controller
 
         $copy = LocalCopy::findOrFail($validated['local_copy_id']);
         
-        // Verifica se a cópia pertence à biblioteca do atendente (se houver essa restrição)
-        if ($attendant->library_id && $copy->library_id !== $attendant->library_id) {
-            abort(403, 'Você não tem permissão para emprestar exemplares de outras bibliotecas.');
+        // Verifica se a cópia e o leitor pertencem às bibliotecas do atendente (se houver essa restrição)
+        if (!$attendant->isCurator()) {
+            $associatedLibraryIds = $attendant->getStaffLibraryIds();
+            
+            // Valida unidade da cópia
+            if (!in_array($copy->library_id, $associatedLibraryIds)) {
+                abort(403, 'Você não tem permissão para emprestar exemplares de outras bibliotecas.');
+            }
+
+            // Valida unidade do leitor
+            $readerHasAssociatedLibrary = $reader->libraries()->whereIn('libraries.id', $associatedLibraryIds)->exists();
+            if (!$readerHasAssociatedLibrary) {
+                return back()->withErrors(['user_id' => 'O leitor selecionado deve estar associado a uma das suas unidades.'])->withInput();
+            }
         }
 
         // Verifica disponibilidade
+        if ($copy->status === 'unavailable') {
+            return back()->with('error', 'Este exemplar está marcado como indisponível na unidade no momento.')->withInput();
+        }
+
         $activeLoansCount = Loan::where('local_copy_id', $copy->id)->active()->count();
         if ($activeLoansCount >= $copy->quantity) {
             return back()->with('error', 'Não há exemplares disponíveis deste livro no momento. Todos estão emprestados.')->withInput();
         }
 
         // Cria o registro de empréstimo
-        Loan::create([
+        $loan = Loan::create([
             'local_copy_id' => $copy->id,
             'user_id' => $reader->id,
             'attendant_id' => $attendant->id,
@@ -135,6 +201,15 @@ class LoanController extends Controller
             'due_date' => $validated['due_date'],
             'status' => 'borrowed',
         ]);
+
+        $copy->syncStatus();
+
+        // Enviar e-mail de notificação de empréstimo
+        try {
+            \Mail::to($reader->email)->send(new \App\Mail\BookBorrowedMail($loan));
+        } catch (\Exception $e) {
+            \Log::error('Erro ao enviar e-mail de empréstimo: ' . $e->getMessage());
+        }
 
         return redirect()->route('loans.index')->with('success', 'Empréstimo registrado com sucesso!');
     }
@@ -152,8 +227,11 @@ class LoanController extends Controller
         $loan = Loan::findOrFail($id);
 
         // Verifica se pertence à biblioteca do atendente
-        if ($attendant->library_id && $loan->localCopy->library_id !== $attendant->library_id) {
-            abort(403, 'Acesso negado.');
+        if (!$attendant->isCurator()) {
+            $associatedLibraryIds = $attendant->getStaffLibraryIds();
+            if (!in_array($loan->localCopy->library_id, $associatedLibraryIds)) {
+                abort(403, 'Acesso negado.');
+            }
         }
 
         if ($loan->return_date) {
@@ -164,6 +242,15 @@ class LoanController extends Controller
             'return_date' => Carbon::today(),
             'status' => 'returned',
         ]);
+
+        $loan->localCopy->syncStatus();
+
+        // Enviar e-mail de notificação de devolução
+        try {
+            \Mail::to($loan->user->email)->send(new \App\Mail\BookReturnedMail($loan));
+        } catch (\Exception $e) {
+            \Log::error('Erro ao enviar e-mail de devolução: ' . $e->getMessage());
+        }
 
         return redirect()->route('loans.index')->with('success', 'Livro devolvido com sucesso!');
     }
